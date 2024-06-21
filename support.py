@@ -11,10 +11,13 @@ NUM_MINES = 80
 
 # Colors
 WHITE = (255, 255, 255)
-BACKGROUND_COLOR = (60, 60, 60)
+BACKGROUND_COLOR = (80, 80, 80)
 LIGHT_GREY = (180, 180, 180)
+DARK_GREY = (60, 60, 60, 150) 
 RED = (200, 0, 0)
 GREEN = (0, 200, 0)
+DARK_GREEN = (0, 100, 0, 200)
+BLACK = (0, 0, 0)
 
 # Game levels
 GAME_LEVELS = {level: {"width": w, "height": h, "mines": m} for level, (w, h, m) in (
@@ -28,7 +31,7 @@ GAME_LEVELS = {level: {"width": w, "height": h, "mines": m} for level, (w, h, m)
 )}
 
 # Initial screen dimensions
-screen_width, screen_height = 1000, 800
+screen_width, screen_height = 1000, 850
 sidebar_width = 300
 
 # Variables for scroll and zoom
@@ -61,18 +64,18 @@ avoid_first_click = False
 
 
 ################# Functions #################
-def save_game_data(level, result, elapsed_time):
+def save_stats(level, result, elapsed_time):
     if elapsed_time <= 0:
         return
     current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"{current_date},{level},{result},{elapsed_time}\n"
-    with open('game_data.csv', 'a', encoding='utf-8') as file:
+    with open('stats.csv', 'a', encoding='utf-8') as file:
         file.write(line)
 
 def load_game_stats():
     stats = {}
     try:
-        with open('game_data.csv', mode='r') as file:
+        with open('stats.csv', mode='r') as file:
             reader = csv.reader(file)
             for row in reader:
                 date, level, result, elapsed_time = row
