@@ -9,6 +9,17 @@ from support import *
 # Initialize Pygame
 pygame.init()
 
+# Load 3D textures
+tile_texture = pygame.image.load('textures/tile.png')
+mine_texture = pygame.image.load('textures/mine.png')
+flag_texture = pygame.image.load('textures/flag.png')
+
+# Load pixelated font
+pixelated_font = pygame.font.Font('fonts/pixelated_font.ttf', 24)
+
+# Initial font size for the game over/won message
+message_font_size = 24
+
 def initialize_grid(level):
     global GRID_WIDTH, GRID_HEIGHT, NUM_MINES, grid, revealed, non_mine_tiles
     GRID_WIDTH, GRID_HEIGHT, NUM_MINES = GAME_LEVELS[level].values()
@@ -65,12 +76,12 @@ def reveal_tile(x, y):
         reveal_mines()
         elapsed_time = int(time.time() - start_time) if start_time else 0
         start_time = None  # Stop the timer when the game is lost
-        save_game_data(current_level, 'loss', elapsed_time)
+        save_stats(current_level, 'loss', elapsed_time)
     elif num_revealed == non_mine_tiles:
         game_won = True
         elapsed_time = int(time.time() - start_time) if start_time else 0
         start_time = None  # Stop the timer when the game is won
-        save_game_data(current_level, 'win', elapsed_time)
+        save_stats(current_level, 'win', elapsed_time)
         
 def reveal_mines():
     for x, y in mines:
@@ -87,36 +98,42 @@ def draw_grid(screen, grid_width, grid_height, tile_size, padding_x, padding_y):
             if 0 <= x < grid_width and 0 <= y < grid_height:
                 if revealed[y][x]:
                     if grid[y][x] == -1:
-                        pygame.draw.rect(screen, RED, rect)
+                        screen.blit(pygame.transform.scale(mine_texture, (rect_width, rect_height)), rect)
                     else:
-                        pygame.draw.rect(screen, LIGHT_GREY, rect)
+                        screen.blit(pygame.transform.scale(tile_texture, (rect_width, rect_height)), rect)
                         if grid[y][x] > 0:
-                            font = pygame.font.Font(None, int(24 * zoom))
-                            text = font.render(str(grid[y][x]), True, WHITE)
+                            text = pixelated_font.render(str(grid[y][x]), True, WHITE)
                             text_rect = text.get_rect(center=rect.center)
                             screen.blit(text, text_rect)
                 else:
                     pygame.draw.rect(screen, WHITE, rect)
                     if (x, y) in flags:
                         flag_center = (rect.centerx, rect.centery)
-                        pygame.draw.circle(screen, RED, flag_center, int(tile_size * zoom * 0.2))
+                        screen.blit(pygame.transform.scale(flag_texture, (int(tile_size * zoom * 0.4), int(tile_size * zoom * 0.4))), (flag_center[0] - int(tile_size * zoom * 0.2), flag_center[1] - int(tile_size * zoom * 0.2)))
             pygame.draw.rect(screen, WHITE, rect, 1)
 
 def draw_interface(screen):
-    global elapsed_time, game_over, game_won
-    font = pygame.font.Font(None, 36)
+    global elapsed_time, game_over, game_won, message_font_size
 
-    # Calculate positions
+    # Initialize or increment message_font_size
+    if not (game_over or game_won):
+        message_font_size = 24  # Reset font size when game is active
+    else:
+        if message_font_size < 72:
+            message_font_size += 1  # Increase font size when game is over
+        else:
+            message_font_size = 72  # Cap font size at 72
+
+    # Calculate positions for interface elements
+    font = pixelated_font
     time_position = (20, 20)
     fraction_text = f"Progress: {num_revealed}/{non_mine_tiles} ({int(num_revealed / non_mine_tiles * 100)}%)"
     fraction_position = ((screen_width - font.render(fraction_text, True, WHITE).get_width()) // 2, 20)
     flags_text = f"Flags: {len(flags)} / {NUM_MINES}"
     flags_position = (screen_width - font.render(flags_text, True, WHITE).get_width() - 20, 20)
-    game_text = "Game Over! You hit a mine." if game_over else ("Congratulations! You won." if game_won else "")
-    game_text_position = ((screen_width - font.render(game_text, True, RED if game_over else GREEN if game_won else WHITE).get_width()) // 2, 60)
 
     # Draw a semi-transparent background for the interface
-    interface_background_color = (50, 50, 50, 200)  # Dark gray with some transparency
+    interface_background_color = DARK_GREY  # Dark gray with some transparency
     interface_background_rect = pygame.Rect(0, 0, screen_width, 60)
     pygame.draw.rect(screen, interface_background_color, interface_background_rect)
 
@@ -124,17 +141,22 @@ def draw_interface(screen):
     if start_time:
         elapsed_time = int(time.time() - start_time)
     time_text = f"Time: {elapsed_time} s"
-    screen.blit(font.render(time_text, True, WHITE), time_position)
+    screen.blit(font.render(time_text, True, RED), time_position)
 
     # Draw non-mine tiles revealed fraction
-    screen.blit(font.render(fraction_text, True, WHITE), fraction_position)
+    screen.blit(font.render(fraction_text, True, GREEN), fraction_position)
 
     # Draw number of flags marked / Total number of mines
-    screen.blit(font.render(flags_text, True, WHITE), flags_position)
+    screen.blit(font.render(flags_text, True, RED), flags_position)
 
-    # Draw game status text
-    game_render = font.render(game_text, True, RED if game_over else GREEN if game_won else WHITE)
-    screen.blit(game_render, game_text_position)
+    # Draw game status text with growing size
+    if game_over or game_won:
+        message_font = pygame.font.Font('fonts/pixelated_font.ttf', message_font_size)
+        game_text = "Game Over! You hit a mine." if game_over else "Congratulations! You won."
+        game_text_color = RED if game_over else DARK_GREEN
+        game_text_render = message_font.render(game_text, True, game_text_color)
+        game_text_rect = game_text_render.get_rect(center=(screen_width // 2, screen_height // 2))
+        screen.blit(game_text_render, game_text_rect)
 
     draw_button(screen, font, "Exit to Main Menu", 20, screen_height - 70, 250, 50)
     draw_button(screen, font, "Regenerate Game", screen_width - 250 - 20, screen_height - 70, 250, 50)
@@ -142,10 +164,10 @@ def draw_interface(screen):
     pygame.display.flip()
 
 def draw_button(screen, font, text, x, y, width, height):
-    button_background_color = (70, 70, 70)  # Dark gray background
+    button_background_color = DARK_GREY  # Dark gray background
     pygame.draw.rect(screen, button_background_color, (x, y, width, height))
     pygame.draw.rect(screen, WHITE, (x, y, width, height), 2)
-    text_surface = font.render(text, True, WHITE)
+    text_surface = font.render(text, True, RED)
     text_rect = text_surface.get_rect(center=(x + width // 2, y + height // 2))
     screen.blit(text_surface, text_rect)
 
@@ -178,7 +200,7 @@ def main_game(level):
             if event.type == pygame.QUIT:
                 if not game_won:
                     elapsed_time = int(time.time() - start_time) if start_time else 0
-                    save_game_data(level, 'loss', elapsed_time)
+                    save_stats(level, 'loss', elapsed_time)
                 pygame.quit()
                 sys.exit()
             elif event.type == pygame.VIDEORESIZE:
@@ -187,7 +209,7 @@ def main_game(level):
                 if event.key == pygame.K_ESCAPE:
                     if not game_won:
                         elapsed_time = int(time.time() - start_time) if start_time else 0
-                        save_game_data(level, 'loss', elapsed_time)
+                        save_stats(level, 'loss', elapsed_time)
                     return 'home'  # Signal to return to home
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:  # Left click
@@ -207,7 +229,7 @@ def main_game(level):
                     if exit_button_rect.collidepoint(event.pos):
                         if not game_won:
                             elapsed_time = int(time.time() - start_time) if start_time else 0
-                            save_game_data(level, 'loss', elapsed_time)
+                            save_stats(level, 'loss', elapsed_time)
                         return 'home'  # Signal to return to home
                     
                     # Check if regenerate button is clicked
@@ -215,7 +237,7 @@ def main_game(level):
                     if regenerate_button_rect.collidepoint(event.pos):
                         if not game_won:
                             elapsed_time = int(time.time() - start_time) if start_time else 0
-                            save_game_data(level, 'loss', elapsed_time)                        
+                            save_stats(level, 'loss', elapsed_time)                        
                         main_game(level)  # Regenerate game
 
             elif event.type == pygame.MOUSEMOTION:
